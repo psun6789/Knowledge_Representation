@@ -1,0 +1,603 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Oct 01 12:21:08 2021
+
+@author: Peter Sunny Shanthveer Markappa
+"""
+
+import os, sys, inspect
+from agents import *
+from search import *
+from logic import *
+import numpy as np
+import time
+
+
+current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+
+
+class GPSCoordinates(Thing):
+    pass
+
+
+class MoveRightCoordinate(Thing):
+    pass
+
+
+class MoveLeftCoordinate(Thing):
+    pass
+
+class MoveForwardCoordinate(Thing):
+    pass
+
+class MoveBackCoordinate(Thing):
+    pass
+
+
+'''The is the function where Environment is prepared for the drone '''
+class Air_Coordinates_Map(GraphicEnvironment):
+    def percept(self, agent):
+        ''' This will return the things that are in our Drone current co-ordinate '''
+        drone_thing = self.list_things_at(agent.location)
+        return drone_thing
+
+    def execute_action(self, agent, action):
+        ''' This will change state of Drone'''
+        if action == "move_forward_coordinate":
+            if agent.direction == "D":
+                print('{}Drone has decided to move back because of move back instruction {}'.format(str(agent)[1:-1], agent.location))
+            else:
+                print('{} Drone decided to move {} at coordinate: {}'.format(str(agent)[1:-1], action, agent.location))
+            if agent.move_forward_coordinate():
+                if agent.direction == "D":
+                    print('{} Drone moved behind with coordinate: {}'.format(str(agent)[1:-1], agent.location))
+                else:
+                    print('{} Drone decided to move {} its present coordinate is: {}'.format(str(agent)[1:-1], action, agent.location))
+            else:
+                print("{} Drone cannot move forward".format(agent))
+
+        # Drone getting Right side coordinates signal
+        elif action == 'move_to_right_coordinate':
+            print('{} Drone decided to turn  {} with coordinate location: {}'.format(str(agent)[1:-1], action, agent.location))
+            if agent.move_to_right_coordinate():
+                print('{} Drone moved to right side of its coordinate and its new coordinate is: {}'.format(str(agent)[1:-1], agent.location))
+            else:
+                print("{} Drone cannot move right because of some obstacles ".format(agent))
+
+        elif action == 'move_to_left_coordinate':
+            print('{} Drone decided to turn  {} with coordinate location: {}'.format(str(agent)[1:-1], action, agent.location))
+            if agent.move_to_left_coordinate():
+                print('{} Drone moved to Left side of its coordinate and its new coordinate is: {}'.format(str(agent)[1:-1], agent.location))
+            else:
+                print("{} Drone cannot move right because of some obstacles".format(agent))
+
+        # Some times drone has to stop in the air because of Signal problem
+        elif action == "stop_signal":
+            print('{}Drone decided to stop {} for some time {} '.format(str(agent)[1:-1], action, agent.stop_timing))
+            if agent.stop_signal():
+                print("    {} Drone stopped for {} ".format(str(agent)[1:-1], agent.stop_timing))
+
+        # Checking for Drone Destination
+        elif action == 'drone_destination':
+            print(" Drone has reached its destination with co-ordinate {} equal to destination_coordinate {} ".format(agent.location,agent.delivery_location))
+            return
+
+
+    '''this is the coordinates and our drone will use this for Searching i.e., part 2 of the assignment'''
+    def droneCoordinatesMap(self):
+        drone_coordinates_gps = UndirectedGraph(dict(
+            amazon_office=dict(coordinate1=3, coordinate2=2, coordinate3=3.5),
+            coordinate1=dict(coordinate4=1.5, coordinate5=1),
+            coordinate2=dict(coordinate5=2, coordinate6=1.5),
+            coordinate3=dict(Block7=1, Block8=1, Block9=4),
+            coordinate4=dict(delivery_destination=6),
+            coordinate6=dict(coordinate10=2.5, coordinate11=2),
+            coordinate7=dict(danger_zone=4),
+            coordinate8=dict(danger_zone=5),
+            coordinate9=dict(danger_zone=6),
+            coordinate10=dict(delivery_destination=2),
+            coordinate11=dict(delivery_destination=1),
+            danger_zone=dict(delivery_destination=3)
+        )
+        )
+
+
+        drone_coordinates_gps.locations = dict(
+            amazon_office=(0, 0), coordinate1=(1, 1), coordinate2=(1, 2),
+            coordinate3=(1, 3), coordinate4=(2, 1), Block5=(3, 1),
+            coordinate6=(5, 1), coordinate7=(5, 2), coordinate8=(5, 3),
+            coordinate9=(5, 4), coordinate10=(4, 6), coordinate11=(4, 5),
+            delivery_destination=(6, 6), danger_zone=(6, 8)
+        )
+
+        return drone_coordinates_gps, drone_coordinates_gps.locations
+
+
+
+    def is_done(self):
+        if (self.agents[0].location == self.agents[0].delivery_location).all() or (self.agents[0].drone_battery_level <= 0):
+            return True
+        return False
+
+
+
+
+
+
+
+''' this class explains about agent which is drone is updates its current state of the drone'''
+
+class DroneDeliveryAgent(Agent):
+    location = np.array([0, 0])
+    delivery_location = np.array([6, 6])
+    stop_timing = 1
+    drone_battery_level = 100
+    drone_achievement = 10
+    direction = "U"
+    stage = {}
+
+
+    def update_state(self, action):
+        self.stage[tuple(self.location)] = action
+
+    def check_current_state(self):
+        if (self.location == self.delivery_location).all():
+            return True
+        return False
+
+
+    def move_forward_coordinate(self):
+        if self.direction == "U":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 10
+            self.location[0] += 1
+            return True
+
+        elif self.direction == "R":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 10
+            self.location[1] += 1
+            return True
+
+        elif self.direction == "L":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 10
+            self.location[1] -= 1
+            return True
+
+        elif self.direction == "D":
+            self.drone_achievement += 1
+            self.location[0] -= 1
+            return True
+
+
+
+    def move_to_right_coordinate(self):
+        if self.direction == "U":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 10
+            self.location[1] += 1
+            self.direction = "R"
+            return True
+
+        elif self.direction == "L":
+            self.drone_battery_level -= 10
+            self.drone_achievement = -1
+            self.location[0] += 1
+            self.direction = "U"
+            return True
+
+        elif self.direction == "R":
+            self.drone_achievement += 1
+            self.location[0] -= 1
+            self.direction = "D"
+            return True
+
+        elif self.direction == "D":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 5
+            self.location[1] -= 1
+            self.direction = "L"
+            return True
+
+    def move_to_left_coordinate(self):
+        if self.direction == "U":
+            self.drone_achievement -= 1
+            self.drone_battery_level -= 5
+            self.location[1] -= 1
+            self.direction = "L"
+            return True
+
+        elif self.direction == "R":
+            # self.current_location[0] += 1
+            self.location[0] += 1
+            self.drone_battery_level -= 5
+            self.drone_achievement -= 1
+            self.direction = "U"
+            return True
+
+        elif self.direction == "L":
+            self.location[0] -= 1
+            self.drone_achievement += 1
+            self.direction = "D"
+            return True
+
+        elif self.direction == "D":
+            self.location[1] += 1
+            self.drone_battery_level -= 5
+            self.drone_achievement -= 1
+            self.direction = "R"
+            return True
+
+    def diagonal_move(self):
+        self.location += 1
+        self.direction = "U"
+        return True
+
+    def diagonal_move_down(self):
+        self.location -= 1
+        self.direction = "D"
+        return True
+
+    def stop_signal(self):
+        time.sleep(self.stop_timing)
+        self.drone_achievement += 5
+        self.move_forward_coordinate()
+        return True
+
+
+
+
+    def search(self, problem, search_method):
+        if search_method == "breadth_first_tree_search":
+            print(".......Breadth First Tree Search Start......")
+            drone_search_result = breadth_first_tree_search(problem)
+            print(".......Breadth First Tree Search End......")
+            return drone_search_result
+
+        elif search_method == "depth_first_tree_search":
+            print(".......Depth First Tree Search Start......")
+            drone_search_result = depth_first_graph_search(problem)
+            print(".......Depth First Tree Search End......")
+            return drone_search_result
+
+        elif search_method == "uniform_cost_search":
+            print(".......Uniform Cost Search Start......")
+            drone_search_result = uniform_cost_search(problem)
+            print(".......Uniform Cost Search ends......")
+            return drone_search_result
+
+        elif search_method == "breadth_first_graph_search":
+            print(".......Breadth First Graph Search Start......")
+            drone_search_result = best_first_graph_search(problem, lambda node: node.state)
+            print(".......Breadth First Graph Search Ends......")
+            return drone_search_result
+
+        elif search_method == "a_star_search":
+            print(".......A* Search Start......")
+            drone_search_result = astar_search(problem)
+            print(".......A* Search Ends......")
+            return drone_search_result
+
+        elif search_method == "recursive_best_first_search":
+            print(".......Recursive Best First Search Start......")
+            drone_search_result = recursive_best_first_search(problem)
+            print("    Recursive Best First Search technique complete")
+            return drone_search_result
+
+    def get_present_coordinate_location(self, location, air_gps_coordinate_location):
+        for i, j in air_gps_coordinate_location.items():
+            if tuple(self.location) == j:
+                return i
+
+
+
+
+
+
+
+
+
+
+# adding things to Drone environment
+def drone_things(env, thing, location):
+    env_size = np.array([env.width, env.height])
+    if (location <= env_size).all():
+        env.add_thing(thing, location)
+    else:
+        print(" drone cannot be added {} at this coordinate: {} as Drone environment size is: {}, choose different coordinate".format(thing, location, env_size))
+        return
+
+
+def DroneEnvironment(agent, env, runs):
+    for i in range(runs):
+        if not env.is_done():
+            print("\nRun: {}: Drone present coordinate is: {}".format(i, agent.location))
+            print(" Drone Battery Level is : ", agent.drone_battery_level)
+            env.step()
+        else:
+            if (agent.location == agent.delivery_location).all():
+                print(" Drone reached its goal which is at {} and current location of agent is: {}".format(
+                    agent.location, agent.delivery_location))
+                return
+            elif (agent.drone_battery_level <= 0):
+                print("    {} has run out of drone battery level so it stopped moving now".format(agent))
+                return
+
+
+
+
+'''Drone actions is based on the destination(goal) when drone flies '''
+def DroneGoalBased():
+    drone_model = {}
+
+    def program(percepts):
+        print(" Drone Goal Based is : ", drone_model)
+        print(" Drone Percept is:", percepts)
+
+        for i in percepts:
+            if str(i) in drone_model.keys():
+                print("Drone Percept is Matched: ", i)
+                drone_action = drone_model[str(i)]
+                print("Drone Activity: ", drone_action)
+                return drone_action
+            if isinstance(i, GPSCoordinates):
+                drone_action = "stop_signal"
+                drone_model[str(i)] = drone_action
+                return drone_action
+            elif isinstance(i, MoveRightCoordinate):
+                drone_action = "move_to_right_coordinate"
+                drone_model[str(i)] = drone_action
+                return drone_action
+            elif isinstance(i, MoveLeftCoordinate):
+                drone_action = "move_to_left_coordinate"
+                drone_model[str(i)] = drone_action
+
+            drone_present_status = i.check_current_state()
+            if drone_present_status:
+                return "drone_destination"
+            else:
+                if (i.location[0] < i.delivery_location[0]):
+                    i.direction = "U"
+                    return "move_forward_coordinate"
+                elif (i.location[0] > i.delivery_location[0]):
+                    i.direction = "D"
+                    return "move_forward_coordinate"
+                elif (i.location[1] < i.delivery_location[1]):
+                    i.direction = "U"
+                    return "move_to_right_coordinate"
+                else:
+                    i.direction = "U"
+                    return "move_to_left_coordinate"
+
+    return DroneDeliveryAgent(program)
+
+
+
+
+def DroneGoalBasedAgentRun():
+    air_coordinates_map_goal_based = Air_Coordinates_Map(100, 100)
+    delivery_drone = DroneGoalBased()
+    gps_signal = GPSCoordinates()
+    gps_right_coordinate_1 = MoveRightCoordinate()
+    gps_right_coordinate_2 = MoveRightCoordinate()
+    gps_left_coordinate_1 = MoveLeftCoordinate()
+    drone_things(air_coordinates_map_goal_based, delivery_drone, [0, 0])
+    drone_things(air_coordinates_map_goal_based, gps_right_coordinate_2, [6, 1])
+    drone_things(air_coordinates_map_goal_based, gps_signal, [5, 0])
+    drone_things(air_coordinates_map_goal_based, gps_right_coordinate_1, [8, 0])
+    drone_things(air_coordinates_map_goal_based, gps_left_coordinate_1, [12, 0])
+    print("***************** Goal BasedModel Agent Run Starts for Delivery Drone **************************\n")
+    print("\nDrone is working is Model state... start....")
+    DroneEnvironment(delivery_drone, air_coordinates_map_goal_based, 10)
+    print("\n Drone has completed its model based agent run...")
+    print("***************** Model Based Run Over for Delivery Drone **************************\n")
+
+
+
+
+
+
+
+# Actions based on percepts which have been percieved earlier
+def DroneModelBased():
+    drone_model = {}
+    def program(percepts):
+        print(" Drone Model is : ", drone_model)
+        print(" Drone Percept is:", percepts)
+        for i in percepts:
+            if str(i) in drone_model.keys():
+                print("Drone Percept is Matched: ", i)
+                action = drone_model[str(i)]
+                print("Drone Activity: ", action)
+                return action
+            if isinstance(i, GPSCoordinates):
+                action = "stop_signal"
+                drone_model[str(i)] = action
+                return action
+            elif isinstance(i, MoveRightCoordinate):
+                action = "move_to_right_coordinate"
+                drone_model[str(i)] = action
+                return action
+            elif isinstance(i, MoveLeftCoordinate):
+                action = "move_to_left_coordinate"
+                drone_model[str(i)] = action
+                return action
+        return "move_forward_coordinate"
+
+    return DroneDeliveryAgent(program)
+
+
+
+def DroneModelAgentRun():
+    air_coordinates_map_model = Air_Coordinates_Map(100, 100)
+    delivery_drone = DroneModelBased()
+    gps_signal = GPSCoordinates()
+    gps_right_coordinate_1 = MoveRightCoordinate()
+    gps_right_coordinate_2 = MoveRightCoordinate()
+    gps_left_coordinate_1 = MoveLeftCoordinate()
+    gps_left_coordinate_2 = MoveLeftCoordinate()
+    drone_things(air_coordinates_map_model, delivery_drone, [0, 0])
+    drone_things(air_coordinates_map_model, gps_signal, [5, 0])
+    drone_things(air_coordinates_map_model, gps_right_coordinate_1, [8, 0])
+    drone_things(air_coordinates_map_model, gps_right_coordinate_2, [8, 4])
+    drone_things(air_coordinates_map_model, gps_left_coordinate_1, [6, 4])
+    drone_things(air_coordinates_map_model, gps_left_coordinate_2, [6, 6])
+    print("***************** Model Agent Run Starts for Delivery Drone **************************\n")
+    print("\nDrone is working is Model state... start....")
+    DroneEnvironment(delivery_drone, air_coordinates_map_model, 10)
+    print("\n Drone has completed its model based agent run...")
+    print("***************** Model Based Run Over for Delivery Drone **************************\n")
+
+
+
+# Simple Reflex Agent (actions based on the percept)
+def DroneSimpleAgent():
+    def program(percepts):
+        for i in percepts:
+            if isinstance(i, GPSCoordinates):
+                return "stop_signal"
+            elif isinstance(i, MoveRightCoordinate):
+                return "move_to_right_coordinate"
+            elif isinstance(i, MoveLeftCoordinate):
+                return "move_to_left_coordinate"
+        return "move_forward_coordinate"
+    return DroneDeliveryAgent(program)
+
+
+def DroneSimpleAgentRun():
+    air_coordinates_map_1 = Air_Coordinates_Map(100, 100)
+    delivery_drone = DroneSimpleAgent()
+    gps_signal = GPSCoordinates()
+    gps_right_coordinate = MoveRightCoordinate()
+    gps_left_coordinate = MoveLeftCoordinate()
+    drone_things(air_coordinates_map_1, delivery_drone, [0, 0])
+    drone_things(air_coordinates_map_1, gps_signal, [5, 0])
+    drone_things(air_coordinates_map_1, gps_right_coordinate, [8, 0])
+    drone_things(air_coordinates_map_1, gps_left_coordinate, [12, 0])
+    print("***************** Simple Agent Run Starts for Delivery Drone **************************\n")
+    print("\nDrone is made to work in Simplex Reflex Model... start....")
+    DroneEnvironment(delivery_drone, air_coordinates_map_1, 25)
+    print("\nDrone Simplex Reflex Model ends here")
+    print("***************** Simple Agent Run Over for Delivery Drone **************************\n")
+
+
+
+
+
+
+
+
+
+'''Second part of question searching algorithm'''
+def SearchingMethodsUsingGoalBased(different_search_algorithm, drone_coordinates_gps, air_gps_coordinate_location, problem):
+    drone_model = {}
+    searching_methods = different_search_algorithm
+
+    def program(percepts):
+        print(" Drone Goal Based is : ", drone_model)
+        print(" Drone Percept is:", percepts)
+
+        for i in percepts:
+            if str(i) in drone_model.keys():
+                print("Drone Percept is Matched: ", i)
+                drone_action = drone_model[str(i)]
+                print("Drone Activity: ", drone_action)
+                return drone_action
+            if isinstance(i, GPSCoordinates):
+                drone_action = "stop_signal"
+                drone_model[str(i)] = drone_action
+                return drone_action
+            elif isinstance(i, MoveRightCoordinate):
+                drone_action = "move_to_right_coordinate"
+                drone_model[str(i)] = drone_action
+                return drone_action
+            elif isinstance(i, MoveLeftCoordinate):
+                drone_action = "move_to_left_coordinate"
+                drone_model[str(i)] = drone_action
+
+            drone_present_status = i.check_current_state()
+            if drone_present_status:
+                return "drone_destination"
+            else:
+                present_coordinate_location = i.get_present_coordinate_location(i.location, air_gps_coordinate_location)
+                delivery_drone_prg = GraphProblem(present_coordinate_location, 'amazon_office', drone_coordinates_gps)
+                drone_res = i.search(delivery_drone_prg, searching_methods)
+                sequence = drone_res.solution()
+
+                print("Searching is obtained from {} : {}".format(searching_methods, sequence))
+                print("cost of route {} = {} ".format(searching_methods, drone_res.path_cost))
+
+                for gps in sequence:
+                    drone_loc_coordinates = np.array(air_gps_coordinate_location[gps])
+                    while not (i.location == drone_loc_coordinates).all():
+                        if (i.location[0] < drone_loc_coordinates[0]):
+                            i.drone_achievement -= 1
+                            i.drone_battery_level -= 10
+                            i.location[0] += 1
+                        elif (i.location[0] > drone_loc_coordinates[0]):
+                            i.drone_achievement += 1
+                            i.location[0] -= 1
+                        elif (i.location[1] < drone_loc_coordinates[1]):
+                            i.direction = "R"
+                            i.drone_achievement -= 1
+                            i.drone_battery_level -= 10
+                            i.location[1] += 1
+                        else:
+                            i.direction = "L"
+                            i.drone_achievement -= 1
+                            i.drone_battery_level -= 10
+                            i.location[1] -= 1
+    return DroneDeliveryAgent(program)
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+    '''Assignment 2nd question'''
+    print("Here I'm Demonstrating Different Agents")
+
+    print("Simple Reflex Agent Start\n")
+    DroneSimpleAgentRun()
+    print("Simple Reflex Agent End\n")
+    print("------------------------------------------")
+
+
+    print("Model Based Agent Start\n")
+    DroneModelAgentRun()
+    print("Model Based Agent End\n")
+    print("------------------------------------------")
+
+    print("Goal Based Agent Start\n")
+    DroneGoalBasedAgentRun()
+    print("Goal Based Agent End\n")
+    print("------------------------------------------")
+
+    '''Assignment 2nd question'''
+    print("Different Searching is applied")
+    print("-----------------------------------------")
+    bangalore_city = Air_Coordinates_Map(100, 100)
+    city_map, city_map_locations = bangalore_city.droneCoordinatesMap()
+    city_problem = GraphProblem('amazon_office', 'delivery_destination', city_map)
+
+    search_methods = ["breadth_first_tree_search", "depth_first_tree_search", "uniform_cost_search", "breadth_first_graph_search", "a_star_search", "recursive_best_first_search"]
+    for method in search_methods:
+        agent = SearchingMethodsUsingGoalBased(method, city_map, city_map_locations, city_problem)
+        drone_things(bangalore_city, agent, [0, 0])
+        DroneEnvironment(agent, bangalore_city, 1)
+        print(" Drone reached delivery location with coordinate {} with {} searching method".format(agent.location, method))
+        print("Batter left is: ", agent.drone_battery_level)
+        bangalore_city.delete_thing(agent)
+
+
+
+

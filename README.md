@@ -1,5 +1,5 @@
 # Knowledge_Representation
-Here I'm implementing different agents and searching algorithm for my Assignment.
+Implementing different agents and searching algorithm for my Assignment.
 
 To run this file follow this steps
 
